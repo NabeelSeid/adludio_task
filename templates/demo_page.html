@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Creative Recommendation Engine</title>
+    <link rel="stylesheet" type="text/css" href="./css/style.css" />
+    <script src="./js/jquery-3.4.1.min.js" type="text/javascript"></script>
+
+    <link rel="stylesheet" type="text/css"
+    href="./css/jquery.datetimepicker.css"/ >
+    <script src="./js/moment.min.js"></script>
+
+    <link rel="stylesheet" href="./css/jquery-ui.css" />
+    <link rel="stylesheet" href="./css/jquery-ui.theme.css" />
+    <script src="./js/jquery-ui.js"></script>
+
+    <link rel="stylesheet" href="./css/bootstrap.min.css" />
+    <script src="./js/popper.min.js"></script>
+    <script src="./js/bootstrap.min.js"></script>
+  </head>
+
+  <style>
+    td {
+      vertical-align: top;
+      border-bottom: 1px dashed silver;
+      padding: 20px;
+    }
+    .preview {
+      margin-inline: 80px;
+      margin-top: 10px;
+    }
+  </style>
+
+  <body>
+    <nav class="navbar navbar-light" style="background-color: #e3f2fd">
+      <span class="h2">Creative Recommendation Engine</span>
+    </nav>
+    <br />
+    <div class="container">
+      <div id="form_section"></div>
+      <div style="height: 100px"></div>
+      <div id="results_panel"></div>
+    </div>
+  </body>
+
+  <script>
+    var BASE_URL = "http://" + window.location.hostname + ":{{ port }}/";
+
+    var manual_res = {
+      1: {
+        url:
+          "https://preview.adludio.com/2792465c1d612933d82798829ed1f5d9/817c5e7f53433864282a",
+        "Engagement rate": "53%",
+        "Click-through rate": "7%",
+        Impressions: "93300",
+        Engagements: "49800",
+        "Click-through": "6500",
+        Countries: '["Hong Kong"]',
+        "Adunit area width": "600.0",
+        "Adunit area height": "900.0",
+        "Engagement area width": "600.0",
+        "Engagement area height": "900.0",
+        "Engagement area horizontal distance from top left": "0.0",
+        "Engagement area vertical distance from top left": "0.0",
+        "Click-through icon width": "339.0",
+        "Click-through icon height": "80.0",
+        "Click-through icon horizontal distance from top left": "131.0",
+        "Click-through icon vertical distance from top left": "797.0",
+      },
+    };
+
+    // extract all relevant form data from a form
+    function get_form_data(form_elem) {
+      var FormData = {};
+
+      $(form_elem)
+        .find("select")
+        .each(function (index) {
+          var input = $(this);
+          if (input.attr("name")) {
+            FormData[input.attr("name")] = Array.isArray(input.val())
+              ? [...input.val()]
+              : [input.val()];
+          }
+        });
+
+      $(form_elem)
+        .find("input")
+        .each(function (index) {
+          var input = $(this);
+          if (input.attr("name")) {
+            FormData[input.attr("name")] = [input.val()];
+          }
+        });
+      return FormData;
+    }
+
+    var tt;
+    var d;
+    function submit_form(elem) {
+      var url = BASE_URL + "recommend_sort_games";
+      var form_id = $(elem.form).attr("id");
+      var data_ = get_form_data(elem.form);
+      console.log(data_);
+      d = data_;
+
+      console.log(JSON.stringify(data_));
+      $.ajax({
+        type: "POST",
+        url: url,
+        data: JSON.stringify(data_),
+        success: function (res) {
+          // process data
+          tt = JSON.parse(res);
+          display_results(JSON.parse(res));
+          console.log("It's a success!");
+        },
+        error: function (res) {
+          console.log("error");
+        },
+      });
+    }
+
+    function preview_ads(id, version) {
+      console.log(id);
+      $(`button#${id}`).replaceWith(
+        $("<iframe />", {
+          src: `https://wat.adludio.com/games/${id}/${version}/index.html`,
+        })
+      );
+    }
+
+    function display_results(res) {
+      var results_panel = $("<div />", { id: "results_panel" });
+      var table = $("<table />");
+      console.log(res);
+      res.forEach(function (result, index) {
+        table.append(
+          $("<tr />").append(
+            $("<td />").append(
+              $("<button />", {
+                id: result.game_id,
+                text: "Preview Ad",
+                class: "preview btn btn-primary",
+                onClick: `preview_ads('${result.game_id}', '${result.version}')`,
+              })
+            ),
+            $("<td />").append(
+              $("<div />").append(
+                $("<b />", { text: "Score: " }),
+                $("<span />", { text: result.score })
+              ),
+              $("<div />").append(
+                $("<b />", { text: "Engagement rate: " }),
+                $("<span />", { text: result.e_r })
+              ),
+              $("<div />").append(
+                $("<b />", { text: "Click through rate: " }),
+                $("<span />", { text: result.ctr })
+              ),
+              $("<div />").append(
+                $("<b />", { text: "Game id: " }),
+                $("<span />", { text: result.game_id })
+              ),
+              $("<div />").append(
+                $("<b />", { text: "Version: " }),
+                $("<span />", { text: result.version })
+              )
+            )
+          )
+        );
+      });
+
+      if (res.length == 0) {
+        results_panel.append($("<h2 />", { text: "No Ads found!" }));
+      } else {
+        results_panel.append($("<h3 />", { text: `${res.length} Ads found!` }));
+        results_panel.append(table);
+      }
+
+      $("div#results_panel").replaceWith(results_panel);
+    }
+
+    var tt;
+    function list_searchable_parameters() {
+      var url = BASE_URL + "list_searchable_parameters";
+      console.log(url);
+      $.ajax({
+        type: "GET",
+        url: url,
+        success: function (res) {
+          // process data
+          tt = JSON.parse(res);
+          populate_form(JSON.parse(res));
+          console.log("It's a success!");
+        },
+        error: function (res) {},
+      });
+    }
+
+    // auto generate a form, based on current data
+    function populate_form(searchable_parameters) {
+      var form = $("<form/>", {
+        action: "javascript:void(0);",
+        id: "api_access",
+      });
+
+      var target_group = $("<select />", {
+        name: "vertical",
+        class: "form-control",
+        required: "required",
+      }).append(
+        $("<option />", {
+          text: "Select target",
+          value: "",
+          hidden: "hidden",
+          selected: "selected",
+        })
+      );
+      var season = $("<select />", {
+        name: "season",
+        class: "form-control",
+        required: "required",
+      }).append(
+        $("<option />", {
+          text: "Select season",
+          value: "",
+          hidden: "hidden",
+          selected: "selected",
+        })
+      );
+      var region = $("<select />", {
+        name: "region",
+        multiple: "multiple",
+        class: "form-control",
+        required: "required",
+      });
+      var campaign_objective = $("<select />", {
+        name: "campaign_objective",
+        class: "form-control",
+        required: "required",
+      }).append(
+        $("<option />", {
+          text: "Select campaign objective",
+          value: "",
+          hidden: "hidden",
+          selected: "selected",
+        })
+      );
+
+      searchable_parameters.inputs.vertical.forEach(function (item, index) {
+        target_group.append($("<option />", { value: item, text: item }));
+      });
+
+      searchable_parameters.inputs.season.forEach(function (item, index) {
+        season.append($("<option />", { value: item, text: item }));
+      });
+
+      searchable_parameters.inputs.region.forEach(function (item, index) {
+        region.append($("<option />", { value: item, text: item }));
+      });
+
+      searchable_parameters.targets.forEach(function (item, index) {
+        campaign_objective.append($("<option />", { value: item, text: item }));
+      });
+
+      // Labels
+      var target_group_label = $("<label />", {
+        for: "target_group",
+        text: "Target Group",
+      });
+      var season_label = $("<label />", {
+        for: "season",
+        text: "Seasone",
+      });
+      var region_label = $("<label />", {
+        for: "region",
+        text: "Region",
+      });
+      var campaign_objective_label = $("<label />", {
+        for: "campaign_objective",
+        text: "Campaign Objective",
+      });
+
+      var form_row = $("<div />", { class: "form-row" }).append(
+        $("<div />", { class: "form-group col-md-6" }).append(
+          target_group_label,
+          target_group
+        ),
+        $("<div />", { class: "form-group col-md-2" }).append(
+          season_label,
+          season
+        ),
+        $("<div />", { class: "form-group col-md-4" }).append(
+          campaign_objective_label,
+          campaign_objective
+        )
+      );
+
+      form.append(
+        form_row,
+        region_label,
+        region,
+        $("<br/>"),
+        $("<input/>", {
+          type: "submit",
+          class: "submit btn btn-primary float-right",
+          onClick: "submit_form(this)",
+          value: "Get Best Performing Ads",
+        })
+      );
+
+      $("div#form_section").append(
+        // Creating Form Div and Adding <h2> and <p> Paragraph Tag in it.
+        form
+      );
+    }
+
+    $(document).ready(function () {
+      list_searchable_parameters();
+    });
+  </script>
+</html>
